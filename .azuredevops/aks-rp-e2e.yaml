@@ -1,0 +1,65 @@
+trigger:
+  - master
+
+pr:
+  - master
+
+pool:
+  name: $(1ES_DevInfra_Bazel_Build_Pool_Name)
+
+resources:
+  repositories:
+  - repository: aksrp # alias must not have -, it will fail $[] resolution
+    type: git
+    name: CloudNativeCompute/aks-rp
+    ref: master
+
+variables:
+  aksrp_version: $[ resources.repositories.aksrp.version ]
+
+jobs:
+- job: RulesGoE2E
+  displayName: 'Patched Rules Go E2E Tests'
+  workspace:
+    clean: all
+  steps:
+  - template: /.pipelines/dev/tasktemplates/aks-rp-repo-checkout-template.yaml@aksrp
+    parameters:
+      source_version: $(aksrp_version)
+  - template: /.pipelines/dev/tasktemplates/aks-1es-agent-pool-status-template.yaml@aksrp
+  - checkout: self
+    fetchDepth: 1
+  - script: |
+      set -euxo pipefail
+      echo "==== Before Patch ===="
+      grep -A 8 'bazel_dep(name = "rules_go"' MODULE.bazel
+      echo "==== Before Patch ===="
+      sed -i -z 's|archive_override\([^)]*module_name = "rules_go"[^)]*\)|local_path_override(module_name = "rules_go", path = "$(Pipeline.Workspace)/s/rules_go"|' MODULE.bazel
+      echo "==== After Patch ===="
+      grep -A 2 'bazel_dep(name = "rules_go"' MODULE.bazel
+      echo "==== After Patch ===="
+    workingDirectory: /repos/aks-rp
+    name: PatchLocalOverrides
+    displayName: 'Patch Local Overrides'
+  - script: |
+      set -euxo pipefail
+      ./hack/aksbuilder.sh tidy -w devinfraservices/aksbazelbuildfarm
+    workingDirectory: /repos/aks-rp
+    name: Tidy
+    displayName: 'Mazel Tidy'
+    env:
+      AKS_GOPROXY_MSI: $(AKS_GOPROXY_MSI)
+      AKS_GOPROXY_TOKEN: $(GOPROXY_STATIC_TOKEN)
+      ENABLE_AKS_GOPROXY_AAD_AUTH: $(ENABLE_AKS_GOPROXY_AAD_AUTH)
+      MAZEL_FIRST_STAGE_ACR: $(FIRST_STAGE_ACR_EASTUS)
+  - script: |
+      set -euxo pipefail
+      ./hack/aksbuilder.sh build -w devinfraservices/aksbazelbuildfarm
+    workingDirectory: /repos/aks-rp
+    name: Build
+    displayName: 'Mazel Build'
+    env:
+      AKS_GOPROXY_MSI: $(AKS_GOPROXY_MSI)
+      AKS_GOPROXY_TOKEN: $(GOPROXY_STATIC_TOKEN)
+      ENABLE_AKS_GOPROXY_AAD_AUTH: $(ENABLE_AKS_GOPROXY_AAD_AUTH)
+      MAZEL_FIRST_STAGE_ACR: $(FIRST_STAGE_ACR_EASTUS)

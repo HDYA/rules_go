@@ -1,0 +1,37 @@
+trigger:
+- master # we only publish from master branch
+pr: none
+pool:
+  name: $(1ES_DevInfra_Normal_Pool_Name) # just git archive
+
+jobs:
+- job: Publish
+  displayName: 'Publish Patched Rules Go'
+  workspace:
+    clean: all
+  steps:
+  - checkout: self
+    fetchDepth: 1
+  - script: |
+      set -euxo pipefail
+      sed -i '4s/.*/    version = "$(Build.BuildNumber)",/' MODULE.bazel
+    displayName: 'Replace Version with Build Number'
+  - script: |
+      set -euxo pipefail
+      git archive --format=tar.gz -o $(Build.ArtifactStagingDirectory)/rules-go-$(Build.BuildNumber).tar.gz HEAD
+    displayName: 'Git Archive'
+  - publish: $(Build.ArtifactStagingDirectory)
+    artifact: rules-go
+  - task: AzureCLI@2
+    displayName: 'Upload Artifact to Azure Storage'
+    inputs:
+      azureSubscription: 'aks e2e msi operator'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        az storage blob upload \
+          --account-name 'aksdevinfra' \
+          --container-name '$web' \
+          --file "$(Build.ArtifactStagingDirectory)/rules-go-$(Build.BuildNumber).tar.gz" \
+          --name "rules-go/rules-go-$(Build.BuildNumber).tar.gz" \
+          --auth-mode login

@@ -1,0 +1,55 @@
+trigger:
+  - master
+
+pr:
+  - master
+
+pool:
+  name: $(1ES_DevInfra_Bazel_Build_Pool_Name)
+
+steps:
+  - checkout: self
+    clean: true
+    fetchDepth: 1
+
+  - script: |
+      set -euxo pipefail
+
+      BAZELISK_VERSION="v1.19.0"
+      BAZELISK_BINARY="bazelisk-linux-amd64"
+      DOWNLOAD_URL="https://github.com/bazelbuild/bazelisk/releases/download/${BAZELISK_VERSION}/${BAZELISK_BINARY}"
+
+      echo "Downloading Bazelisk from ${DOWNLOAD_URL}..."
+      curl -L -o bazel "${DOWNLOAD_URL}"
+      chmod +x bazel
+      ./bazel --version
+
+      echo "##vso[task.setvariable variable=BAZEL_PATH;]$(pwd)/bazel"
+    displayName: 'Setup Bazelisk'
+
+  - script: |
+      set -euxo pipefail
+      $(BAZEL_PATH) build -- ...
+    displayName: 'Build'
+
+  - script: |
+      set -euxo pipefail
+      $(BAZEL_PATH) test --flaky_test_attempts=10 --build_tests_only -- ...
+    displayName: 'Tests'
+
+  - script: |
+      set -euxo pipefail
+      pushd tests/bcr
+        $(BAZEL_PATH) build -- //...
+        $(BAZEL_PATH) test --flaky_test_attempts=10 --build_tests_only -- //...
+      popd
+    displayName: 'BCR Tests'
+
+  # Publish Test Results to Azure DevOps
+  - task: PublishTestResults@2
+    condition: succeededOrFailed()
+    inputs:
+      testResultsFormat: 'JUnit'
+      testResultsFiles: 'bazel-testlogs/**/test.xml'
+      mergeTestResults: true
+      testRunTitle: 'Bazel Tests'
