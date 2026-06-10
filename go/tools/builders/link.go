@@ -43,7 +43,8 @@ func link(args []string) error {
 	flags := flag.NewFlagSet("link", flag.ExitOnError)
 	goenv := envFlags(flags)
 	main := flags.String("main", "", "Path to the main archive.")
-	packagePath := flags.String("p", "", "Package path of the main archive.")
+	packagePath := flags.String("p", "", "Package path (importmap) of the main archive.")
+	importPath := flags.String("importpath", "", "User-visible import path of the main archive.")
 	outFile := flags.String("o", "", "Path to output file.")
 	flags.Var(&archives, "arc", "Label, package path, and file name of a dependency, separated by '='")
 	packageList := flags.String("package_list", "", "The file containing the list of standard library packages")
@@ -90,7 +91,11 @@ func link(args []string) error {
 		}
 	}
 
-	buildInfo, err := buildLinkBuildInfo(*packagePath, *buildmode)
+	buildInfoPath := *importPath
+	if buildInfoPath == "" {
+		buildInfoPath = *packagePath
+	}
+	buildInfo, err := buildLinkBuildInfo(buildInfoPath, *buildmode)
 	if err != nil {
 		return err
 	}

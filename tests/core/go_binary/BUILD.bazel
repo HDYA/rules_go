@@ -29,10 +29,25 @@ go_binary(
     importpath = "example.com/buildinfo",
 )
 
+go_library(
+    name = "buildinfo_importmap_lib",
+    srcs = ["buildinfo_bin.go"],
+    importmap = "internal.example.com/buildinfo_importmap",
+    importpath = "example.com/buildinfo_importmap",
+)
+
+go_binary(
+    name = "buildinfo_importmap_bin",
+    embed = [":buildinfo_importmap_lib"],
+)
+
 go_test(
     name = "buildinfo_test",
     srcs = ["buildinfo_test.go"],
-    data = [":buildinfo_bin"],
+    data = [
+        ":buildinfo_bin",
+        ":buildinfo_importmap_bin",
+    ],
     rundir = ".",
     deps = ["@io_bazel_rules_go//go/tools/bazel:go_default_library"],
 )

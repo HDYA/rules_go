@@ -223,12 +223,12 @@ func modInfoData(info string) string {
 		"\xf9\x32\x43\x31\x86\x18\x20\x72\x00\x82\x42\x10\x41\x16\xd8\xf2"
 }
 
-func buildLinkBuildInfo(packagePath, buildMode string) (string, error) {
+func buildLinkBuildInfo(importPath, buildMode string) (string, error) {
 	ok, err := onVersion(18)
 	if err != nil {
 		return "", err
 	}
-	if !ok || packagePath == "" {
+	if !ok || importPath == "" {
 		return "", nil
 	}
 	if buildMode == "" {
@@ -236,7 +236,7 @@ func buildLinkBuildInfo(packagePath, buildMode string) (string, error) {
 	}
 
 	buf := &bytes.Buffer{}
-	fmt.Fprintf(buf, "path\t%s\n", packagePath)
+	fmt.Fprintf(buf, "path\t%s\n", importPath)
 	appendBuildInfoSetting(buf, "-buildmode", buildMode)
 	appendBuildInfoSetting(buf, "-compiler", "gc")
 	appendBuildInfoSetting(buf, "CGO_ENABLED", os.Getenv("CGO_ENABLED"))
