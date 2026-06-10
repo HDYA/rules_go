@@ -90,8 +90,13 @@ func link(args []string) error {
 		}
 	}
 
+	buildInfo, err := buildLinkBuildInfo(*packagePath, *buildmode)
+	if err != nil {
+		return err
+	}
+
 	// Build an importcfg file.
-	importcfgName, err := buildImportcfgFileForLink(archives, *packageList, goenv.installSuffix, filepath.Dir(*outFile))
+	importcfgName, err := buildImportcfgFileForLink(archives, *packageList, goenv.installSuffix, filepath.Dir(*outFile), buildInfo)
 	if err != nil {
 		return err
 	}

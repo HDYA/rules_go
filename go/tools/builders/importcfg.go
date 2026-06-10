@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -154,7 +155,7 @@ func buildImportcfgFileForCompile(imports map[string]*archive, installSuffix, di
 	return filename, nil
 }
 
-func buildImportcfgFileForLink(archives []archive, stdPackageListPath, installSuffix, dir string) (string, error) {
+func buildImportcfgFileForLink(archives []archive, stdPackageListPath, installSuffix, dir string, buildInfo string) (string, error) {
 	buf := &bytes.Buffer{}
 	goroot, ok := os.LookupEnv("GOROOT")
 	if !ok {
@@ -196,6 +197,9 @@ package with this path is linked.`,
 		depsSeen[arc.packagePath] = arc.importPath
 		fmt.Fprintf(buf, "packagefile %s=%s\n", arc.packagePath, arc.file)
 	}
+	if buildInfo != "" {
+		fmt.Fprintf(buf, "modinfo %q\n", modInfoData(buildInfo))
+	}
 	f, err := ioutil.TempFile(dir, "importcfg")
 	if err != nil {
 		return "", err
@@ -211,6 +215,59 @@ package with this path is linked.`,
 		return "", err
 	}
 	return filename, nil
+}
+
+func modInfoData(info string) string {
+	return "\x30\x77\xaf\x0c\x92\x74\x08\x02\x41\xe1\xc1\x07\xe6\xd6\x18\xe6" +
+		info +
+		"\xf9\x32\x43\x31\x86\x18\x20\x72\x00\x82\x42\x10\x41\x16\xd8\xf2"
+}
+
+func buildLinkBuildInfo(packagePath, buildMode string) (string, error) {
+	ok, err := onVersion(18)
+	if err != nil {
+		return "", err
+	}
+	if !ok || packagePath == "" {
+		return "", nil
+	}
+	if buildMode == "" {
+		buildMode = "exe"
+	}
+
+	buf := &bytes.Buffer{}
+	fmt.Fprintf(buf, "path\t%s\n", packagePath)
+	appendBuildInfoSetting(buf, "-buildmode", buildMode)
+	appendBuildInfoSetting(buf, "-compiler", "gc")
+	appendBuildInfoSetting(buf, "CGO_ENABLED", os.Getenv("CGO_ENABLED"))
+	appendBuildInfoSetting(buf, "GOARCH", os.Getenv("GOARCH"))
+	appendBuildInfoSetting(buf, "GOEXPERIMENT", os.Getenv("GOEXPERIMENT"))
+	appendBuildInfoSetting(buf, "GOOS", os.Getenv("GOOS"))
+	appendBuildInfoSetting(buf, "GOAMD64", os.Getenv("GOAMD64"))
+	appendBuildInfoSetting(buf, "GOARM", os.Getenv("GOARM"))
+	return buf.String(), nil
+}
+
+func appendBuildInfoSetting(buf *bytes.Buffer, key, value string) {
+	if value == "" {
+		return
+	}
+	value = strings.ReplaceAll(value, "\n", " ")
+	if quoteBuildInfoKey(key) {
+		key = strconv.Quote(key)
+	}
+	if quoteBuildInfoValue(value) {
+		value = strconv.Quote(value)
+	}
+	fmt.Fprintf(buf, "build\t%s=%s\n", key, value)
+}
+
+func quoteBuildInfoKey(key string) bool {
+	return len(key) == 0 || strings.ContainsAny(key, "= \t\r\n\"`")
+}
+
+func quoteBuildInfoValue(value string) bool {
+	return strings.ContainsAny(value, " \t\r\n\"`")
 }
 
 type depsError struct {

@@ -92,3 +92,13 @@ argument on the command line:
 $ bazel build --stamp --workspace_status_command=./status.sh //:cmd
 ```
 
+### Go BuildInfo
+
+With Go 1.18+ toolchains, linked binaries include hermetic
+`runtime/debug.BuildInfo` data in the linker `modinfo` section. The emitted
+metadata currently covers the binary import path plus stable build settings such
+as `-buildmode`, `-compiler`, `CGO_ENABLED`, `GOOS`, and `GOARCH`.
+
+This does not yet include VCS/stamp values or module dependency versions. Use
+`x_defs` and Bazel stamping for VCS or release metadata that must be controlled
+by the workspace status command.

@@ -23,6 +23,20 @@ go_binary(
     visibility = ["//visibility:public"],
 )
 
+go_binary(
+    name = "buildinfo_bin",
+    srcs = ["buildinfo_bin.go"],
+    importpath = "example.com/buildinfo",
+)
+
+go_test(
+    name = "buildinfo_test",
+    srcs = ["buildinfo_test.go"],
+    data = [":buildinfo_bin"],
+    rundir = ".",
+    deps = ["@io_bazel_rules_go//go/tools/bazel:go_default_library"],
+)
+
 go_test(
     name = "go_default_test",
     srcs = ["out_test.go"],
